@@ -4,9 +4,9 @@
  *   This project is licensed under the MIT License, see LICENSE
  */
 
-var parseSignature = require('./signature');
+.import "signature.js" as ParseSignature
 
-const parser = (() => {
+const Parser = (() => {
     'use strict';
 
     var operators = {
@@ -59,7 +59,7 @@ const parser = (() => {
         't': '\t'
     };
 
-    // Tokenizer (lexer) - invoked by the parser to return one token at a time
+    // Tokenizer (lexer) - invoked by the Parser to return one token at a time
     var tokenizer = function (path) {
         var position = 0;
         var length = path.length;
@@ -317,11 +317,11 @@ const parser = (() => {
         return next;
     };
 
-    // This parser implements the 'Top down operator precedence' algorithm developed by Vaughan R Pratt; http://dl.acm.org/citation.cfm?id=512931.
+    // This Parser implements the 'Top down operator precedence' algorithm developed by Vaughan R Pratt; http://dl.acm.org/citation.cfm?id=512931.
     // and builds on the Javascript framework described by Douglas Crockford at http://javascript.crockford.com/tdop/tdop.html
     // and in 'Beautiful Code', edited by Andy Oram and Greg Wilson, Copyright 2007 O'Reilly Media, Inc. 798-0-596-51004-6
 
-    var parser = function (source, recover) {
+    var Parser = function (source, recover) {
         var node;
         var lexer;
 
@@ -631,7 +631,7 @@ const parser = (() => {
                     }
                     advance('>');
                     try {
-                        this.signature = parseSignature(sig);
+                        this.signature = ParseSignature(sig);
                     } catch (err) {
                         // insert the position into this error
                         err.position = sigPos + err.offset;
@@ -850,7 +850,7 @@ const parser = (() => {
         });
 
         // tail call optimization
-        // this is invoked by the post parser to analyse lambda functions to see
+        // this is invoked by the post Parser to analyse lambda functions to see
         // if they make a tail call.  If so, it is replaced by a thunk which will
         // be invoked by the trampoline loop during function application.
         // This enables tail-recursive functions to be written without growing the stack
@@ -1339,7 +1339,7 @@ const parser = (() => {
             return result;
         };
 
-        // now invoke the tokenizer and the parser and return the syntax tree
+        // now invoke the tokenizer and the Parser and return the syntax tree
         lexer = tokenizer(source);
         advance();
         // parse the tokens
@@ -1370,7 +1370,6 @@ const parser = (() => {
         return expr;
     };
 
-    return parser;
+    return Parser;
 })();
 
-module.exports = parser;

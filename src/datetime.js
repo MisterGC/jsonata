@@ -4,7 +4,7 @@
  *   This project is licensed under the MIT License, see LICENSE
  */
 
-const utils = require('./utils');
+.import "utils.js" as Utils
 
 /**
  * DateTime formatting and parsing functions
@@ -14,7 +14,7 @@ const utils = require('./utils');
 const dateTime = (function () {
     'use strict';
 
-    const stringToArray = utils.stringToArray;
+    const stringToArray = Utils.Utils.stringToArray;
 
     const few = ['Zero', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten',
         'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
@@ -205,7 +205,7 @@ const dateTime = (function () {
     }
 
     /**
-     * Formats an integer as specified by the XPath fn:format-integer function
+     * Formats an integer as specified by the XPath Fn:format-integer function
      * See https://www.w3.org/TR/xpath-functions-31/#func-format-integer
      * @param {number} value - the number to be formatted
      * @param {string} picture - the picture string that specifies the format
@@ -489,7 +489,7 @@ const dateTime = (function () {
     function analyseDateTimePicture(picture) {
         var spec = [];
         const format = {
-            type: 'datetime',
+            type: 'DateTime',
             parts: spec
         };
         const addLiteral = function (start, end) {
@@ -820,7 +820,7 @@ const dateTime = (function () {
     let iso8601Spec = null;
 
     /**
-     * formats the date/time as specified by the XPath fn:format-dateTime function
+     * formats the date/time as specified by the XPath Fn:format-dateTime function
      * @param {number} millis - the timestamp to be formatted, in millis since the epoch
      * @param {string} picture - the picture string that specifies the format
      * @param {string} timezone - the timezone to use
@@ -941,8 +941,8 @@ const dateTime = (function () {
      */
     function generateRegex(formatSpec) {
         var matcher = {};
-        if (formatSpec.type === 'datetime') {
-            matcher.type = 'datetime';
+        if (formatSpec.type === 'DateTime') {
+            matcher.type = 'DateTime';
             matcher.parts = formatSpec.parts.map(function (part) {
                 var res = {};
                 if (part.type === 'literal') {
@@ -1335,4 +1335,3 @@ const dateTime = (function () {
     };
 })();
 
-module.exports = dateTime;

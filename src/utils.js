@@ -4,7 +4,7 @@
  *   This project is licensed under the MIT License, see LICENSE
  */
 
-const utils = (() => {
+const Utils = (() => {
     'use strict';
 
     /**
@@ -204,4 +204,3 @@ const utils = (() => {
     };
 })();
 
-module.exports = utils;

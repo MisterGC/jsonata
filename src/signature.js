@@ -4,7 +4,7 @@
  *   This project is licensed under the MIT License, see LICENSE
  */
 
-var utils = require('./utils');
+.import "utils.js" as Utils
 
 const signature = (() => {
     'use strict';
@@ -25,7 +25,7 @@ const signature = (() => {
      * @param {string} signature - the signature between the <angle brackets>
      * @returns {Function} validation function
      */
-    function parseSignature(signature) {
+    function ParseSignature(signature) {
         // create a Regex that represents this signature and return a function that when invoked,
         // returns the validated (possibly fixed-up) arguments, or throws a validation error
         // step through the signature, one symbol at a time
@@ -155,7 +155,7 @@ const signature = (() => {
         var regex = new RegExp(regexStr);
         var getSymbol = function (value) {
             var symbol;
-            if (utils.isFunction(value)) {
+            if (Utils.Utils.isFunction(value)) {
                 symbol = 'f';
             } else {
                 var type = typeof value;
@@ -311,7 +311,6 @@ const signature = (() => {
         };
     }
 
-    return parseSignature;
+    return ParseSignature;
 })();
 
-module.exports = signature;

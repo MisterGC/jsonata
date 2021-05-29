@@ -4,22 +4,22 @@
  *   This project is licensed under the MIT License, see LICENSE
  */
 
-var utils = require('./utils');
+.import "utils.js" as Utils
 
 const functions = (() => {
     'use strict';
 
-    var isNumeric = utils.isNumeric;
-    var isArrayOfStrings = utils.isArrayOfStrings;
-    var isArrayOfNumbers = utils.isArrayOfNumbers;
-    var createSequence = utils.createSequence;
-    var isSequence = utils.isSequence;
-    var isFunction = utils.isFunction;
-    var isLambda = utils.isLambda;
-    var isIterable = utils.isIterable;
-    var getFunctionArity = utils.getFunctionArity;
-    var deepEquals = utils.isDeepEqual;
-    var stringToArray = utils.stringToArray;
+    var isNumeric = Utils.Utils.isNumeric;
+    var isArrayOfStrings = Utils.Utils.isArrayOfStrings;
+    var isArrayOfNumbers = Utils.Utils.isArrayOfNumbers;
+    var createSequence = Utils.Utils.createSequence;
+    var isSequence = Utils.Utils.isSequence;
+    var isFunction = Utils.Utils.isFunction;
+    var isLambda = Utils.Utils.isLambda;
+    var isIterable = Utils.Utils.isIterable;
+    var getFunctionArity = Utils.Utils.getFunctionArity;
+    var deepEquals = Utils.Utils.isDeepEqual;
+    var stringToArray = Utils.Utils.stringToArray;
 
     /**
      * Sum function
@@ -762,7 +762,7 @@ const functions = (() => {
     }
 
     /**
-     * Formats a number into a decimal string representation using XPath 3.1 F&O fn:format-number spec
+     * Formats a number into a decimal string representation using XPath 3.1 F&O Fn:format-number spec
      * @param {number} value - number to format
      * @param {String} picture - picture string definition
      * @param {Object} [options] - override locale defaults
@@ -2065,4 +2065,3 @@ const functions = (() => {
     };
 })();
 
-module.exports = functions;

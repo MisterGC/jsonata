@@ -9,11 +9,11 @@
  * @description JSON query and transformation language
  */
 
-var datetime = require('./datetime');
-var fn = require('./functions');
-var utils = require('./utils');
-var parser = require('./parser');
-var parseSignature = require('./signature');
+.import "datetime.js" as DateTime
+.import "functions.js" as Fn
+.import "utils.js" as Utils
+.import "parser.js" as Parser
+.import "signature.js" as ParseSignature
 
 /**
  * jsonata
@@ -24,16 +24,16 @@ var parseSignature = require('./signature');
 var jsonata = (function() {
     'use strict';
 
-    var isNumeric = utils.isNumeric;
-    var isArrayOfStrings = utils.isArrayOfStrings;
-    var isArrayOfNumbers = utils.isArrayOfNumbers;
-    var createSequence = utils.createSequence;
-    var isSequence = utils.isSequence;
-    var isFunction = utils.isFunction;
-    var isLambda = utils.isLambda;
-    var isIterable = utils.isIterable;
-    var getFunctionArity = utils.getFunctionArity;
-    var isDeepEqual = utils.isDeepEqual;
+    var isNumeric = Utils.Utils.isNumeric;
+    var isArrayOfStrings = Utils.Utils.isArrayOfStrings;
+    var isArrayOfNumbers = Utils.Utils.isArrayOfNumbers;
+    var createSequence = Utils.Utils.createSequence;
+    var isSequence = Utils.Utils.isSequence;
+    var isFunction = Utils.Utils.isFunction;
+    var isLambda = Utils.Utils.isLambda;
+    var isIterable = Utils.Utils.isIterable;
+    var getFunctionArity = Utils.Utils.getFunctionArity;
+    var isDeepEqual = Utils.Utils.isDeepEqual;
 
     // Start of Evaluator code
 
@@ -439,7 +439,7 @@ var jsonata = (function() {
                             results.push(item);
                         }
                     });
-                } else if (fn.boolean(res)) { // truthy
+                } else if (Fn.functions.boolean(res)) { // truthy
                     results.push(item);
                 }
             }
@@ -457,21 +457,9 @@ var jsonata = (function() {
     function * evaluateBinary(expr, input, environment) {
         var result;
         var lhs = yield * evaluate(expr.lhs, input, environment);
+        var rhs = yield * evaluate(expr.rhs, input, environment);
         var op = expr.value;
 
-        //defer evaluation of RHS to allow short-circuiting
-        var evalrhs = function*(){return yield * evaluate(expr.rhs, input, environment);};
-        if (op === "and" || op === "or") {
-            try {
-                return yield * evaluateBooleanExpression(lhs, evalrhs, op);
-            } catch(err) {
-                err.position = expr.position;
-                err.token = op;
-                throw err;
-            }
-        }
-
-        var rhs = yield * evalrhs();
         try {
             switch (op) {
                 case '+':
@@ -493,6 +481,10 @@ var jsonata = (function() {
                     break;
                 case '&':
                     result = evaluateStringConcat(lhs, rhs);
+                    break;
+                case 'and':
+                case 'or':
+                    result = evaluateBooleanExpression(lhs, rhs, op);
                     break;
                 case '..':
                     result = evaluateRangeExpression(lhs, rhs);
@@ -546,7 +538,7 @@ var jsonata = (function() {
                         if(item.value === '[') {
                             result.push(value);
                         } else {
-                            result = fn.append(result, value);
+                            result = Fn.functions.append(result, value);
                         }
                     }
                 }
@@ -576,7 +568,7 @@ var jsonata = (function() {
      */
     function evaluateName(expr, input, environment) {
         // lookup the 'name' item in the input
-        return fn.lookup(input, expr.value);
+        return Fn.functions.lookup(input, expr.value);
     }
 
     /**
@@ -601,7 +593,7 @@ var jsonata = (function() {
                 var value = input[key];
                 if(Array.isArray(value)) {
                     value = flatten(value);
-                    results = fn.append(results, value);
+                    results = Fn.functions.append(results, value);
                 } else {
                     results.push(value);
                 }
@@ -844,29 +836,33 @@ var jsonata = (function() {
     /**
      * Evaluate boolean expression against input data
      * @param {Object} lhs - LHS value
-     * @param {Function} evalrhs - function to evaluate RHS value
+     * @param {Object} rhs - RHS value
      * @param {Object} op - opcode
      * @returns {*} Result
      */
-    function * evaluateBooleanExpression(lhs, evalrhs, op) {
+    function evaluateBooleanExpression(lhs, rhs, op) {
         var result;
 
-        var lBool = boolize(lhs);
+        var lBool = Fn.functions.boolean(lhs);
+        var rBool = Fn.functions.boolean(rhs);
+
+        if (typeof  lBool === 'undefined') {
+            lBool = false;
+        }
+
+        if (typeof  rBool === 'undefined') {
+            rBool = false;
+        }
 
         switch (op) {
             case 'and':
-                result = lBool && boolize(yield * evalrhs());
+                result = lBool && rBool;
                 break;
             case 'or':
-                result = lBool || boolize(yield * evalrhs());
+                result = lBool || rBool;
                 break;
         }
         return result;
-    }
-
-    function boolize(value) {
-        var booledValue = fn.boolean(value);
-        return typeof booledValue === 'undefined' ? false : booledValue;
     }
 
     /**
@@ -881,10 +877,10 @@ var jsonata = (function() {
         var lstr = '';
         var rstr = '';
         if (typeof lhs !== 'undefined') {
-            lstr = fn.string(lhs);
+            lstr = Fn.functions.string(lhs);
         }
         if (typeof rhs !== 'undefined') {
-            rstr = fn.string(rhs);
+            rstr = Fn.functions.string(rhs);
         }
 
         result = lstr.concat(rstr);
@@ -937,7 +933,7 @@ var jsonata = (function() {
                     }
 
                     // append it as an array
-                    groups[key].data = fn.append(groups[key].data, item);
+                    groups[key].data = Fn.functions.append(groups[key].data, item);
                 } else {
                     groups[key] = entry;
                 }
@@ -972,7 +968,7 @@ var jsonata = (function() {
         Object.assign(result, tupleStream[0]);
         for(var ii = 1; ii < tupleStream.length; ii++) {
             for(const prop in tupleStream[ii]) {
-                result[prop] = fn.append(result[prop], tupleStream[ii][prop]);
+                result[prop] = Fn.functions.append(result[prop], tupleStream[ii][prop]);
             }
         }
         return result;
@@ -1041,7 +1037,7 @@ var jsonata = (function() {
      */
     function* evaluateBindExpression(expr, input, environment) {
         // The RHS is the expression to evaluate
-        // The LHS is the name of the variable to bind to - should be a VARIABLE token (enforced by parser)
+        // The LHS is the name of the variable to bind to - should be a VARIABLE token (enforced by Parser)
         var value = yield * evaluate(expr.rhs, input, environment);
         environment.bind(expr.lhs.value, value);
         return value;
@@ -1057,7 +1053,7 @@ var jsonata = (function() {
     function* evaluateCondition(expr, input, environment) {
         var result;
         var condition = yield * evaluate(expr.condition, input, environment);
-        if (fn.boolean(condition)) {
+        if (Fn.functions.boolean(condition)) {
             result = yield * evaluate(expr.then, input, environment);
         } else if (typeof expr.else !== 'undefined') {
             result = yield * evaluate(expr.else, input, environment);
@@ -1092,7 +1088,7 @@ var jsonata = (function() {
      * @returns {Function} Higher order function representing prepared regex
      */
     function evaluateRegex(expr) {
-        var re = new jsonata.RegexEngine(expr.value);
+        var re = new RegExp(expr.value);
         var closure = function(str, fromIndex) {
             var result;
             re.lastIndex = fromIndex || 0;
@@ -1246,7 +1242,7 @@ var jsonata = (function() {
             input: input
         };
         // the `focus` is passed in as the `this` for the invoked function
-        result = yield * fn.sort.apply(focus, [lhs, comparator]);
+        result = yield * Fn.functions.sort.apply(focus, [lhs, comparator]);
 
         return result;
     }
@@ -1337,7 +1333,7 @@ var jsonata = (function() {
         return defineFunction(transformer, '<(oa):o>');
     }
 
-    var chainAST = parser('function($f, $g) { function($x){ $g($f($x)) } }');
+    var chainAST = Parser.Parser('function($f, $g) { function($x){ $g($f($x)) } }');
 
     /**
      * Apply the function on the RHS using the sequence on the LHS as the first argument
@@ -1690,7 +1686,7 @@ var jsonata = (function() {
         });
         var body = 'function(' + sigArgs.join(', ') + '){ _ }';
 
-        var bodyAST = parser(body);
+        var bodyAST = Parser(body);
         bodyAST.body = native;
 
         var partial = partialApplyProcedure(bodyAST, args);
@@ -1744,7 +1740,7 @@ var jsonata = (function() {
             implementation: func
         };
         if(typeof signature !== 'undefined') {
-            definition.signature = parseSignature(signature);
+            definition.signature = ParseSignature.signature(signature);
         }
         return definition;
     }
@@ -1771,7 +1767,7 @@ var jsonata = (function() {
         }
 
         try {
-            var ast = parser(expr, false);
+            var ast = Parser.Parser(expr, false);
         } catch(err) {
             // error parsing the expression passed to $eval
             populateMessage(err);
@@ -1809,7 +1805,7 @@ var jsonata = (function() {
             return undefined;
         }
 
-        return JSON.parse(fn.string(arg));
+        return JSON.parse(Fn.functions.string(arg));
     }
 
     /**
@@ -1841,68 +1837,68 @@ var jsonata = (function() {
     }
 
     // Function registration
-    staticFrame.bind('sum', defineFunction(fn.sum, '<a<n>:n>'));
-    staticFrame.bind('count', defineFunction(fn.count, '<a:n>'));
-    staticFrame.bind('max', defineFunction(fn.max, '<a<n>:n>'));
-    staticFrame.bind('min', defineFunction(fn.min, '<a<n>:n>'));
-    staticFrame.bind('average', defineFunction(fn.average, '<a<n>:n>'));
-    staticFrame.bind('string', defineFunction(fn.string, '<x-b?:s>'));
-    staticFrame.bind('substring', defineFunction(fn.substring, '<s-nn?:s>'));
-    staticFrame.bind('substringBefore', defineFunction(fn.substringBefore, '<s-s:s>'));
-    staticFrame.bind('substringAfter', defineFunction(fn.substringAfter, '<s-s:s>'));
-    staticFrame.bind('lowercase', defineFunction(fn.lowercase, '<s-:s>'));
-    staticFrame.bind('uppercase', defineFunction(fn.uppercase, '<s-:s>'));
-    staticFrame.bind('length', defineFunction(fn.length, '<s-:n>'));
-    staticFrame.bind('trim', defineFunction(fn.trim, '<s-:s>'));
-    staticFrame.bind('pad', defineFunction(fn.pad, '<s-ns?:s>'));
-    staticFrame.bind('match', defineFunction(fn.match, '<s-f<s:o>n?:a<o>>'));
-    staticFrame.bind('contains', defineFunction(fn.contains, '<s-(sf):b>')); // TODO <s-(sf<s:o>):b>
-    staticFrame.bind('replace', defineFunction(fn.replace, '<s-(sf)(sf)n?:s>')); // TODO <s-(sf<s:o>)(sf<o:s>)n?:s>
-    staticFrame.bind('split', defineFunction(fn.split, '<s-(sf)n?:a<s>>')); // TODO <s-(sf<s:o>)n?:a<s>>
-    staticFrame.bind('join', defineFunction(fn.join, '<a<s>s?:s>'));
-    staticFrame.bind('formatNumber', defineFunction(fn.formatNumber, '<n-so?:s>'));
-    staticFrame.bind('formatBase', defineFunction(fn.formatBase, '<n-n?:s>'));
-    staticFrame.bind('formatInteger', defineFunction(datetime.formatInteger, '<n-s:s>'));
-    staticFrame.bind('parseInteger', defineFunction(datetime.parseInteger, '<s-s:n>'));
-    staticFrame.bind('number', defineFunction(fn.number, '<(nsb)-:n>'));
-    staticFrame.bind('floor', defineFunction(fn.floor, '<n-:n>'));
-    staticFrame.bind('ceil', defineFunction(fn.ceil, '<n-:n>'));
-    staticFrame.bind('round', defineFunction(fn.round, '<n-n?:n>'));
-    staticFrame.bind('abs', defineFunction(fn.abs, '<n-:n>'));
-    staticFrame.bind('sqrt', defineFunction(fn.sqrt, '<n-:n>'));
-    staticFrame.bind('power', defineFunction(fn.power, '<n-n:n>'));
-    staticFrame.bind('random', defineFunction(fn.random, '<:n>'));
-    staticFrame.bind('boolean', defineFunction(fn.boolean, '<x-:b>'));
-    staticFrame.bind('not', defineFunction(fn.not, '<x-:b>'));
-    staticFrame.bind('map', defineFunction(fn.map, '<af>'));
-    staticFrame.bind('zip', defineFunction(fn.zip, '<a+>'));
-    staticFrame.bind('filter', defineFunction(fn.filter, '<af>'));
-    staticFrame.bind('single', defineFunction(fn.single, '<af?>'));
-    staticFrame.bind('reduce', defineFunction(fn.foldLeft, '<afj?:j>')); // TODO <f<jj:j>a<j>j?:j>
-    staticFrame.bind('sift', defineFunction(fn.sift, '<o-f?:o>'));
-    staticFrame.bind('keys', defineFunction(fn.keys, '<x-:a<s>>'));
-    staticFrame.bind('lookup', defineFunction(fn.lookup, '<x-s:x>'));
-    staticFrame.bind('append', defineFunction(fn.append, '<xx:a>'));
-    staticFrame.bind('exists', defineFunction(fn.exists, '<x:b>'));
-    staticFrame.bind('spread', defineFunction(fn.spread, '<x-:a<o>>'));
-    staticFrame.bind('merge', defineFunction(fn.merge, '<a<o>:o>'));
-    staticFrame.bind('reverse', defineFunction(fn.reverse, '<a:a>'));
-    staticFrame.bind('each', defineFunction(fn.each, '<o-f:a>'));
-    staticFrame.bind('error', defineFunction(fn.error, '<s?:x>'));
-    staticFrame.bind('assert', defineFunction(fn.assert, '<bs?:x>'));
-    staticFrame.bind('type', defineFunction(fn.type, '<x:s>'));
-    staticFrame.bind('sort', defineFunction(fn.sort, '<af?:a>'));
-    staticFrame.bind('shuffle', defineFunction(fn.shuffle, '<a:a>'));
-    staticFrame.bind('distinct', defineFunction(fn.distinct, '<x:x>'));
-    staticFrame.bind('base64encode', defineFunction(fn.base64encode, '<s-:s>'));
-    staticFrame.bind('base64decode', defineFunction(fn.base64decode, '<s-:s>'));
-    staticFrame.bind('encodeUrlComponent', defineFunction(fn.encodeUrlComponent, '<s-:s>'));
-    staticFrame.bind('encodeUrl', defineFunction(fn.encodeUrl, '<s-:s>'));
-    staticFrame.bind('decodeUrlComponent', defineFunction(fn.decodeUrlComponent, '<s-:s>'));
-    staticFrame.bind('decodeUrl', defineFunction(fn.decodeUrl, '<s-:s>'));
+    staticFrame.bind('sum', defineFunction(Fn.functions.sum, '<a<n>:n>'));
+    staticFrame.bind('count', defineFunction(Fn.functions.count, '<a:n>'));
+    staticFrame.bind('max', defineFunction(Fn.functions.max, '<a<n>:n>'));
+    staticFrame.bind('min', defineFunction(Fn.functions.min, '<a<n>:n>'));
+    staticFrame.bind('average', defineFunction(Fn.functions.average, '<a<n>:n>'));
+    staticFrame.bind('string', defineFunction(Fn.functions.string, '<x-b?:s>'));
+    staticFrame.bind('substring', defineFunction(Fn.functions.substring, '<s-nn?:s>'));
+    staticFrame.bind('substringBefore', defineFunction(Fn.functions.substringBefore, '<s-s:s>'));
+    staticFrame.bind('substringAfter', defineFunction(Fn.functions.substringAfter, '<s-s:s>'));
+    staticFrame.bind('lowercase', defineFunction(Fn.functions.lowercase, '<s-:s>'));
+    staticFrame.bind('uppercase', defineFunction(Fn.functions.uppercase, '<s-:s>'));
+    staticFrame.bind('length', defineFunction(Fn.functions.length, '<s-:n>'));
+    staticFrame.bind('trim', defineFunction(Fn.functions.trim, '<s-:s>'));
+    staticFrame.bind('pad', defineFunction(Fn.functions.pad, '<s-ns?:s>'));
+    staticFrame.bind('match', defineFunction(Fn.functions.match, '<s-f<s:o>n?:a<o>>'));
+    staticFrame.bind('contains', defineFunction(Fn.functions.contains, '<s-(sf):b>')); // TODO <s-(sf<s:o>):b>
+    staticFrame.bind('replace', defineFunction(Fn.functions.replace, '<s-(sf)(sf)n?:s>')); // TODO <s-(sf<s:o>)(sf<o:s>)n?:s>
+    staticFrame.bind('split', defineFunction(Fn.functions.split, '<s-(sf)n?:a<s>>')); // TODO <s-(sf<s:o>)n?:a<s>>
+    staticFrame.bind('join', defineFunction(Fn.functions.join, '<a<s>s?:s>'));
+    staticFrame.bind('formatNumber', defineFunction(Fn.functions.formatNumber, '<n-so?:s>'));
+    staticFrame.bind('formatBase', defineFunction(Fn.functions.formatBase, '<n-n?:s>'));
+    staticFrame.bind('formatInteger', defineFunction(DateTime.dateTime.formatInteger, '<n-s:s>'));
+    staticFrame.bind('parseInteger', defineFunction(DateTime.dateTime.parseInteger, '<s-s:n>'));
+    staticFrame.bind('number', defineFunction(Fn.functions.number, '<(nsb)-:n>'));
+    staticFrame.bind('floor', defineFunction(Fn.functions.floor, '<n-:n>'));
+    staticFrame.bind('ceil', defineFunction(Fn.functions.ceil, '<n-:n>'));
+    staticFrame.bind('round', defineFunction(Fn.functions.round, '<n-n?:n>'));
+    staticFrame.bind('abs', defineFunction(Fn.functions.abs, '<n-:n>'));
+    staticFrame.bind('sqrt', defineFunction(Fn.functions.sqrt, '<n-:n>'));
+    staticFrame.bind('power', defineFunction(Fn.functions.power, '<n-n:n>'));
+    staticFrame.bind('random', defineFunction(Fn.functions.random, '<:n>'));
+    staticFrame.bind('boolean', defineFunction(Fn.functions.boolean, '<x-:b>'));
+    staticFrame.bind('not', defineFunction(Fn.functions.not, '<x-:b>'));
+    staticFrame.bind('map', defineFunction(Fn.functions.map, '<af>'));
+    staticFrame.bind('zip', defineFunction(Fn.functions.zip, '<a+>'));
+    staticFrame.bind('filter', defineFunction(Fn.functions.filter, '<af>'));
+    staticFrame.bind('single', defineFunction(Fn.functions.single, '<af?>'));
+    staticFrame.bind('reduce', defineFunction(Fn.functions.foldLeft, '<afj?:j>')); // TODO <f<jj:j>a<j>j?:j>
+    staticFrame.bind('sift', defineFunction(Fn.functions.sift, '<o-f?:o>'));
+    staticFrame.bind('keys', defineFunction(Fn.functions.keys, '<x-:a<s>>'));
+    staticFrame.bind('lookup', defineFunction(Fn.functions.lookup, '<x-s:x>'));
+    staticFrame.bind('append', defineFunction(Fn.functions.append, '<xx:a>'));
+    staticFrame.bind('exists', defineFunction(Fn.functions.exists, '<x:b>'));
+    staticFrame.bind('spread', defineFunction(Fn.functions.spread, '<x-:a<o>>'));
+    staticFrame.bind('merge', defineFunction(Fn.functions.merge, '<a<o>:o>'));
+    staticFrame.bind('reverse', defineFunction(Fn.functions.reverse, '<a:a>'));
+    staticFrame.bind('each', defineFunction(Fn.functions.each, '<o-f:a>'));
+    staticFrame.bind('error', defineFunction(Fn.functions.error, '<s?:x>'));
+    staticFrame.bind('assert', defineFunction(Fn.functions.assert, '<bs?:x>'));
+    staticFrame.bind('type', defineFunction(Fn.functions.type, '<x:s>'));
+    staticFrame.bind('sort', defineFunction(Fn.functions.sort, '<af?:a>'));
+    staticFrame.bind('shuffle', defineFunction(Fn.functions.shuffle, '<a:a>'));
+    staticFrame.bind('distinct', defineFunction(Fn.functions.distinct, '<x:x>'));
+    staticFrame.bind('base64encode', defineFunction(Fn.functions.base64encode, '<s-:s>'));
+    staticFrame.bind('base64decode', defineFunction(Fn.functions.base64decode, '<s-:s>'));
+    staticFrame.bind('encodeUrlComponent', defineFunction(Fn.functions.encodeUrlComponent, '<s-:s>'));
+    staticFrame.bind('encodeUrl', defineFunction(Fn.functions.encodeUrl, '<s-:s>'));
+    staticFrame.bind('decodeUrlComponent', defineFunction(Fn.functions.decodeUrlComponent, '<s-:s>'));
+    staticFrame.bind('decodeUrl', defineFunction(Fn.functions.decodeUrl, '<s-:s>'));
     staticFrame.bind('eval', defineFunction(functionEval, '<sx?:x>'));
-    staticFrame.bind('toMillis', defineFunction(datetime.toMillis, '<s-s?:n>'));
-    staticFrame.bind('fromMillis', defineFunction(datetime.fromMillis, '<n-s?s?:s>'));
+    staticFrame.bind('toMillis', defineFunction(DateTime.dateTime.toMillis, '<s-s?:n>'));
+    staticFrame.bind('fromMillis', defineFunction(DateTime.dateTime.fromMillis, '<n-s?s?:s>'));
     staticFrame.bind('clone', defineFunction(functionClone, '<(oa)-:o>'));
 
     /**
@@ -1912,9 +1908,9 @@ var jsonata = (function() {
      * Txxxx    - Type errors
      * Dxxxx    - Dynamic errors (evaluate time)
      *  01xx    - tokenizer
-     *  02xx    - parser
-     *  03xx    - regex parser
-     *  04xx    - function signature parser/evaluator
+     *  02xx    - Parser
+     *  03xx    - regex Parser
+     *  04xx    - function signature Parser/evaluator
      *  10xx    - evaluator
      *  20xx    - operators
      *  3xxx    - functions (blocks of 10 for each function)
@@ -1965,7 +1961,7 @@ var jsonata = (function() {
         "T2002": "The right side of the {{token}} operator must evaluate to a number",
         "T2003": "The left side of the range operator (..) must evaluate to an integer",
         "T2004": "The right side of the range operator (..) must evaluate to an integer",
-        "D2005": "The left side of := must be a variable name (start with $)",  // defunct - replaced by S0212 parser error
+        "D2005": "The left side of := must be a variable name (start with $)",  // defunct - replaced by S0212 Parser error
         "T2006": "The right side of the function application operator ~> must be a function",
         "T2007": "Type mismatch when comparing values {{value}} and {{value2}} in order-by clause",
         "T2008": "The expressions within an order-by clause must evaluate to numeric or string values",
@@ -2045,16 +2041,14 @@ var jsonata = (function() {
     /**
      * JSONata
      * @param {Object} expr - JSONata expression
-     * @param {Object} options
-     * @param {boolean} options.recover: attempt to recover on parse error
-     * @param {Function} options.RegexEngine: RegEx class constructor to use
+     * @param {boolean} options - recover: attempt to recover on parse error
      * @returns {{evaluate: evaluate, assign: assign}} Evaluated expression
      */
     function jsonata(expr, options) {
         var ast;
         var errors;
         try {
-            ast = parser(expr, options && options.recover);
+            ast = Parser.Parser(expr, options && options.recover);
             errors = ast.errors;
             delete ast.errors;
         } catch(err) {
@@ -2066,17 +2060,11 @@ var jsonata = (function() {
 
         var timestamp = new Date(); // will be overridden on each call to evalute()
         environment.bind('now', defineFunction(function(picture, timezone) {
-            return datetime.fromMillis(timestamp.getTime(), picture, timezone);
+            return DateTime.dateTime.fromMillis(timestamp.getTime(), picture, timezone);
         }, '<s?s?:s>'));
         environment.bind('millis', defineFunction(function() {
             return timestamp.getTime();
         }, '<:n>'));
-
-        if(options && options.RegexEngine) {
-            jsonata.RegexEngine = options.RegexEngine;
-        } else {
-            jsonata.RegexEngine = RegExp;
-        }
 
         return {
             evaluate: function (input, bindings, callback) {
@@ -2165,10 +2153,9 @@ var jsonata = (function() {
         };
     }
 
-    jsonata.parser = parser; // TODO remove this in a future release - use ast() instead
+    jsonata.Parser = Parser; // TODO remove this in a future release - use ast() instead
 
     return jsonata;
 
 })();
 
-module.exports = jsonata;
